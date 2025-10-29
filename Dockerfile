@@ -27,7 +27,7 @@ WORKDIR /app
 # Sao chép tệp .jar đã build từ stage 'build'
 # Tên tệp .jar có thể cần được thay đổi cho đúng với project của bạn
 # Hãy kiểm tra trong thư mục /target/ của bạn.
-COPY --from=build /app/target/shoe-shopping-cart-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=build /app/target/shoe-ShoppingCart-0.0.1-SNAPSHOT.jar app.jar
 
 # Mở cổng 8080 (cổng mặc định của Spring Boot)
 EXPOSE 8080
