@@ -17,11 +17,10 @@ COPY src ./src
 RUN mvn package -DskipTests
 
 # --- STAGE 2: Run ---
-# Sử dụng một image JRE (Java Runtime) siêu nhẹ, dựa trên Alpine Linux
-# Dùng Corretto 8 của Amazon (phù hợp với Java 1.8 của bạn)
 #
-# DÒNG ĐÃ SỬA LỖI:
-FROM amazoncorretto:8-jre-alpine
+# DÒNG SỬA LỖI CUỐI CÙNG:
+# Sử dụng image OpenJDK 8 JRE Alpine chính thức (chuẩn nhất)
+FROM openjdk:8-jre-alpine
 
 WORKDIR /app
 
