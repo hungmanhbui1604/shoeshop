@@ -1,0 +1,13 @@
+# Loại bỏ các thư mục dependencies
+node_modules
+
+# Loại bỏ các tệp của Git và Docker
+.git
+.gitignore
+Dockerfile
+.dockerignore
+
+# Loại bỏ các tệp môi trường
+.env
+
+README.md

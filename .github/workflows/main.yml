@@ -1,0 +1,93 @@
+name: CI/CD AWS ECR Deploy
+
+# Kích hoạt khi push lên nhánh 'main'
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  #############################
+  # BƯỚC 1: BUILD VÀ PUSH ECR
+  #############################
+  build_and_push_to_ecr:
+    name: Build & Push to ECR
+    runs-on: ubuntu-latest
+
+    steps:
+      # Lấy mã nguồn
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      # 1. Cấu hình thông tin đăng nhập AWS
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # 2. Đăng nhập vào Amazon ECR
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # 3. Build, tag, và push image lên ECR
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          # Lấy URI từ bước đăng nhập ở trên
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          # Tạo một tag image (ví dụ: 'latest' hoặc 'sha-commit')
+          IMAGE_TAG: latest 
+        run: |
+          # Build image
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          # Push image
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+  #############################
+  # BƯỚC 2: DEPLOY LÊN EC2
+  #############################
+  deploy_to_ec2:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: build_and_push_to_ecr # Phải chạy SAU KHI build xong
+
+    steps:
+      # 1. SSH vào EC2 và chạy kịch bản
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          
+          # Kịch bản chạy trên máy chủ EC2
+          script: |
+            # 1. (Rất quan trọng) Đăng nhập Docker vào ECR
+            # Lệnh này dùng IAM Role của EC2 (đã cài ở bước 3b) để tự động lấy mật khẩu
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+            
+            # 2. Kéo image mới nhất từ ECR
+            docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+            
+            # 3. Dừng và xóa container cũ
+            docker stop my-app-container || true
+            docker rm my-app-container || true
+            
+            # 4. Chạy container MỚI
+            #    Lưu ý: truyền tất cả các biến môi trường DB_*
+            docker run -d \
+              --name my-app-container \
+              -p 8000:8000 \
+              --restart always \
+              -e DB_HOST=${{ secrets.DB_HOST }} \
+              -e DB_USER=${{ secrets.DB_USER }} \
+              -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+              -e DB_NAME=${{ secrets.DB_NAME }} \
+              -e PORT=8000 \
+              ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+              
+            # 5. Dọn dẹp image cũ
+            docker image prune -f
