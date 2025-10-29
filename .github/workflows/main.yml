@@ -88,12 +88,16 @@ jobs:
               --name my-app-container \
               -p 8000:8080 \
               --restart always \
+              # SỬA LỖI 1: Sử dụng đúng tên biến môi trường của Spring Boot
               -e SPRING_DATASOURCE_URL="jdbc:mysql://${{ secrets.DB_HOST }}:3306/${{ secrets.DB_NAME }}" \
               -e SPRING_DATASOURCE_USERNAME="${{ secrets.DB_USER }}" \
               -e SPRING_DATASOURCE_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              
+              # SỬA LỖI 2: Đưa về "none" vì chúng ta đã import CSDL
               -e SPRING_JPA_HIBERNATE_DDL_AUTO="none" \
-              -e SPRING_JPA_DATABASE_PLATFORM="org.hibernate.dialect.MySQL5Dialect" \
+              
               ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+              # ---- SỬA LỖI KẾT THÚC ----
               
             # 5. Dọn dẹp image cũ
             echo "Cleaning up old images..."
