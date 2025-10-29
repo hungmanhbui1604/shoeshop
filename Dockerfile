@@ -19,7 +19,9 @@ RUN mvn package -DskipTests
 # --- STAGE 2: Run ---
 # Sử dụng một image JRE (Java Runtime) siêu nhẹ, dựa trên Alpine Linux
 # Dùng Corretto 8 của Amazon (phù hợp với Java 1.8 của bạn)
-FROM amazoncorretto:1.8-alpine-jre
+#
+# DÒNG ĐÃ SỬA LỖI:
+FROM amazoncorretto:8-jre-alpine
 
 WORKDIR /app
 
@@ -28,7 +30,8 @@ WORKDIR /app
 # Hãy kiểm tra trong thư mục /target/ của bạn.
 COPY --from=build /app/target/shoe-shopping-cart-0.0.1-SNAPSHOT.jar app.jar
 
-EXPOSE 8000
+# Mở cổng 8080 (cổng mặc định của Spring Boot)
+EXPOSE 8080
 
 # Lệnh để chạy ứng dụng
 # app.jar sẽ được chạy khi container khởi động

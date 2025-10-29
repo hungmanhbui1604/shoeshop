@@ -37,7 +37,6 @@ jobs:
           # Lấy URI từ bước đăng nhập ở trên
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-          # Tạo một tag image (ví dụ: 'latest' hoặc 'sha-commit')
           IMAGE_TAG: latest 
         run: |
           # Build image
@@ -65,29 +64,39 @@ jobs:
           
           # Kịch bản chạy trên máy chủ EC2
           script: |
+            echo "--- Deploying new version ---"
+            
             # 1. (Rất quan trọng) Đăng nhập Docker vào ECR
-            # Lệnh này dùng IAM Role của EC2 (đã cài ở bước 3b) để tự động lấy mật khẩu
+            echo "Logging into ECR..."
             aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
             
             # 2. Kéo image mới nhất từ ECR
+            echo "Pulling latest image..."
             docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
             
             # 3. Dừng và xóa container cũ
+            echo "Stopping and removing old container..."
             docker stop my-app-container || true
             docker rm my-app-container || true
             
             # 4. Chạy container MỚI
-            #    Lưu ý: truyền tất cả các biến môi trường DB_*
+            echo "Starting new container..."
+            #
+            # DÒNG ĐÃ SỬA LỖI: Ánh xạ cổng 8000 (host) tới 8080 (container)
+            #
             docker run -d \
               --name my-app-container \
-              -p 8000:8000 \
+              -p 8000:8080 \
               --restart always \
-              -e DB_HOST=${{ secrets.DB_HOST }} \
-              -e DB_USER=${{ secrets.DB_USER }} \
-              -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
-              -e DB_NAME=${{ secrets.DB_NAME }} \
-              -e PORT=8000 \
+              -e SPRING_DATASOURCE_URL="jdbc:mysql://${{ secrets.DB_HOST }}:3306/${{ secrets.DB_NAME }}" \
+              -e SPRING_DATASOURCE_USERNAME="${{ secrets.DB_USER }}" \
+              -e SPRING_DATASOURCE_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              -e SPRING_JPA_HIBERNATE_DDL_AUTO="none" \
+              -e SPRING_JPA_DATABASE_PLATFORM="org.hibernate.dialect.MySQL5Dialect" \
               ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
               
             # 5. Dọn dẹp image cũ
+            echo "Cleaning up old images..."
             docker image prune -f
+            echo "--- Deployment successful! ---"
+
